@@ -9,12 +9,17 @@ export class RivalCar {
   readonly body: Phaser.GameObjects.Rectangle;
   private speed = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, width: number, height: number) {
-    this.body = scene.add.rectangle(x, y, width, height, RIVAL_COLOR);
+  constructor(
+    scene: Phaser.Scene, x: number, y: number, width: number, height: number,
+    private readonly maxSpeed = RIVAL_MAX_SPEED,
+    private readonly acceleration = RIVAL_ACCELERATION,
+    color = RIVAL_COLOR
+  ) {
+    this.body = scene.add.rectangle(x, y, width, height, color);
   }
 
   update(seconds: number): void {
-    this.speed = Math.min(RIVAL_MAX_SPEED, this.speed + RIVAL_ACCELERATION * seconds);
+    this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration * seconds);
     this.body.x += this.speed * seconds;
   }
 
