@@ -16,7 +16,6 @@ const FINISH_POSITION_RATIO = 0.9;
 const LANE_SPACING = 80;
 const FALSE_START_SPEED = 90;
 const PAUSE_OVERLAY_DEPTH = 100;
-const SESSION_TIMER_SECONDS = 15;
 const SECOND_RIVAL_MAX_SPEED = 480;
 const SECOND_RIVAL_ACCELERATION = 210;
 const SECOND_RIVAL_COLOR = 0xf97316;
@@ -33,10 +32,7 @@ export class GameScene extends Phaser.Scene {
   private gearText!: Phaser.GameObjects.Text;
   private speedText!: Phaser.GameObjects.Text;
   private startLights: Phaser.GameObjects.Arc[] = [];
-  private sessionTimerText!: Phaser.GameObjects.Text;
-  // Эти поля сохраняются при scene.restart(), но сбрасываются при обновлении страницы.
-  private sessionTimeRemaining = SESSION_TIMER_SECONDS;
-  private sessionTimerStarted = false;
+  // Открытый соперник сохраняется при restart, но сбрасывается при обновлении страницы.
   private secondRivalUnlocked = false;
 
   private raceState: 'countdown' | 'racing' | 'finished' | 'falseStart' = 'countdown';
@@ -90,6 +86,14 @@ export class GameScene extends Phaser.Scene {
         }
       )
       .setOrigin(0.5, 0);
+
+    if (!this.secondRivalUnlocked) {
+      this.add.text(width / 2, 124, 'Чтобы начать вторую фазу, выиграйте заезд', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '20px',
+        color: '#facc15',
+      }).setOrigin(0.5, 0);
+    }
 
     // Машина начинает движение с левой стороны
     this.player = new PlayerCar(
@@ -165,13 +169,6 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     }).setOrigin(0.5, 0);
 
-    this.sessionTimerText = this.add.text(width - 24, 24, '', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '22px',
-      color: '#ffffff',
-    }).setOrigin(1, 0);
-    this.updateSessionTimer(0);
-
     this.pauseOverlay = this.add.container(width / 2, height / 2, [
       this.add.rectangle(0, 0, width, height, 0x000000, 0.65),
       this.add.rectangle(0, 0, 360, 160, 0x1e293b).setStrokeStyle(2, 0x64748b),
@@ -196,9 +193,6 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
-      if (this.sessionTimeRemaining === 0 && this.raceState === 'finished') {
-        this.secondRivalUnlocked = true;
-      }
       this.scene.restart();
       return;
     }
@@ -214,8 +208,6 @@ export class GameScene extends Phaser.Scene {
       Phaser.Input.Keyboard.JustDown(this.cursors.left);
       return;
     }
-
-    if (this.sessionTimerStarted) this.updateSessionTimer(delta / 1000);
 
     if (this.raceState === 'falseStart') {
       this.player.coast(delta / 1000);
@@ -243,17 +235,13 @@ export class GameScene extends Phaser.Scene {
         this.raceState = 'falseStart';
         this.player.launch(FALSE_START_SPEED);
         this.speedText.setText(`Скорость: ${Math.round(this.player.currentSpeed)} пикс/с`);
-        this.raceText.setText('Фальстарт! Поражение.\nR — заново');
+        this.raceText.setText('Фальстарт! Поражение.\nЧтобы начать заново, нажмите R');
         return;
       }
       if (!greenIsOn) return;
       seconds = this.countdownElapsed - this.greenSignalTime;
       this.raceState = 'racing';
       this.raceText.setText('');
-      if (!this.sessionTimerStarted) {
-        this.sessionTimerStarted = true;
-        this.updateSessionTimer(seconds);
-      }
     }
 
     this.raceTime += seconds;
@@ -267,11 +255,12 @@ export class GameScene extends Phaser.Scene {
       const result = this.playerFinishTime < bestRivalTime
         ? 'Победа!'
         : this.playerFinishTime === bestRivalTime ? 'Ничья!' : 'Поражение!';
+      if (this.playerFinishTime < bestRivalTime) this.secondRivalUnlocked = true;
       const rivalResults = this.rivals.map((rival, index) =>
         `Соперник ${index + 1}: ${rival.finishTime!.toFixed(2)} с`
       ).join('\n');
       this.raceText.setText(
-        `${result}\nТвоё время: ${this.playerFinishTime.toFixed(2)} с\n${rivalResults}`
+        `${result}\nТвоё время: ${this.playerFinishTime.toFixed(2)} с\n${rivalResults}\nЧтобы начать заново, нажмите R`
       );
     }
   }
@@ -305,12 +294,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.playerFinishTime === null) this.keepPlayerOnScreen();
-  }
-
-  private updateSessionTimer(seconds: number): void {
-    this.sessionTimeRemaining = Math.max(0, this.sessionTimeRemaining - seconds);
-    this.sessionTimerText.setText(`Новый соперник: ${Math.ceil(this.sessionTimeRemaining)} с`);
-    this.sessionTimerText.setVisible(this.sessionTimeRemaining > 0);
   }
 
   private updateRival(rival: { car: RivalCar; finishTime: number | null }, seconds: number): void {

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { coast, FRICTION } from './carMovement';
 
 const RIVAL_ACCELERATION = 170;
-const RIVAL_MAX_SPEED = 400;
+const RIVAL_MAX_SPEED = 300;
 const RIVAL_COLOR = 0xef4444;
 
 export class RivalCar {
